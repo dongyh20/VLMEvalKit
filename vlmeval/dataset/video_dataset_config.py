@@ -42,6 +42,10 @@ videomme_dataset = {
     'Video-MME_0.5fps_subs': partial(VideoMME, dataset='Video-MME', fps=0.5, use_subtitle=True),
 }
 
+videommev2_dataset = {
+    'Video-MME-v2_64frame': partial(VideoMMEv2, dataset='Video-MME-v2', nframe=64),
+}
+
 videommmu_dataset = {
     'VideoMMMU_8frame': partial(VideoMMMU, dataset='VideoMMMU', nframe=8),
     'VideoMMMU_64frame': partial(VideoMMMU, dataset='VideoMMMU', nframe=64),
@@ -198,7 +202,7 @@ dataset_groups = [
     mmbench_video_dataset, mvbench_dataset, videomme_dataset, videommmu_dataset, longvideobench_dataset,
     mlvu_dataset, tempcompass_dataset, cgbench_dataset, worldsense_dataset, tamperbench_dataset,
     megabench_dataset, qbench_video_dataset, moviechat1k_dataset, vdc_dataset, video_holmes_dataset, vcrbench_dataset,
-    cg_av_counting_dataset, video_mmlu_dataset, egoexobench_dataset, video_tt_dataset
+    cg_av_counting_dataset, video_mmlu_dataset, egoexobench_dataset, video_tt_dataset, videommev2_dataset
 ]
 
 for grp in dataset_groups:

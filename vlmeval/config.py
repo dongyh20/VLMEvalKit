@@ -767,7 +767,7 @@ llava_series = {
     ),
     "Aquila-VL-2B": partial(LLaVA_OneVision, model_path="BAAI/Aquila-VL-2B-llava-qwen"),
     "llava_video_qwen2_7b": partial(
-        LLaVA_OneVision, model_path="lmms-lab/LLaVA-Video-7B-Qwen2"
+        LLaVA_OneVision, model_path="/apdcephfs_jn/share_302244400/peterrao/models/LLaVA-Video-7B-Qwen2"
     ),
     "llava_video_qwen2_72b": partial(
         LLaVA_OneVision, model_path="lmms-lab/LLaVA-Video-72B-Qwen2"
@@ -1932,11 +1932,11 @@ qianfanvl_series = {
     'Qianfan-VL-70B': partial(Qianfan_VL, model_path='baidu/Qianfan-VL-70B'),
 }
 
-lfm2vl_series = {
-    "LFM2-VL-450M": partial(LFM2VL, model_path="LiquidAI/LFM2-VL-450M"),
-    "LFM2-VL-1.6B": partial(LFM2VL, model_path="LiquidAI/LFM2-VL-1.6B"),
-    "LFM2-VL-3B": partial(LFM2VL, model_path="LiquidAI/LFM2-VL-3B"),
-}
+# lfm2vl_series = {
+#     "LFM2-VL-450M": partial(LFM2VL, model_path="LiquidAI/LFM2-VL-450M"),
+#     "LFM2-VL-1.6B": partial(LFM2VL, model_path="LiquidAI/LFM2-VL-1.6B"),
+#     "LFM2-VL-3B": partial(LFM2VL, model_path="LiquidAI/LFM2-VL-3B"),
+# }
 
 internvl_groups = [
     internvl, internvl2, internvl2_5, mini_internvl, internvl2_5_mpo, 
@@ -1969,7 +1969,7 @@ model_groups = [
     long_vita_series, ristretto_series, kimi_series, aguvis_series, hawkvl_series,
     flash_vl, kimi_vllm_series, oryx_series, treevgr_series, varco_vision_series, qtunevl_series, 
     xvl_series, thyme_series, logics_series, cosmos_series, keye_series, qianfanvl_series, 
-    lfm2vl_series, rbdashmm_api_series_lmdeploy, interns1_series, insight_v_series
+    rbdashmm_api_series_lmdeploy, interns1_series, insight_v_series
 ]
 
 for grp in model_groups:
