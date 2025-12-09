@@ -72,8 +72,8 @@ Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
             return True
 
         # original usage
-        # cache_path = get_cache_path(repo_id)
-        cache_path = "/apdcephfs_jn/share_302244400/peterrao/data/videommev2"
+        cache_path = get_cache_path(repo_id)
+        # cache_path = "/apdcephfs_jn/share_302244400/peterrao/data/videommev2"
         if cache_path is not None and check_integrity(cache_path):
             dataset_path = cache_path
         else:
@@ -121,15 +121,15 @@ Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
                 data_file.to_csv(osp.join(pth, f'{dataset_name}.tsv'), sep='\t', index=False)
 
             # original usage
-            # if modelscope_flag_set():
-            #     from modelscope import dataset_snapshot_download
-            #     dataset_path = dataset_snapshot_download(dataset_id=repo_id)
-            # else:
-            #     dataset_path = snapshot_download(repo_id=repo_id, repo_type='dataset')
-            # unzip_hf_zip(dataset_path)
-            # generate_tsv(dataset_path)
-            dataset_path = "/apdcephfs_jn/share_302244400/peterrao/data/videommev2"
+            if modelscope_flag_set():
+                from modelscope import dataset_snapshot_download
+                dataset_path = dataset_snapshot_download(dataset_id=repo_id)
+            else:
+                dataset_path = snapshot_download(repo_id=repo_id, repo_type='dataset')
+            unzip_hf_zip(dataset_path)
             generate_tsv(dataset_path)
+            # dataset_path = "/apdcephfs_jn/share_302244400/peterrao/data/videommev2"
+            # generate_tsv(dataset_path)
 
         data_file = osp.join(dataset_path, f'{dataset_name}.tsv')
 
