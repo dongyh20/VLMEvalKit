@@ -7,6 +7,12 @@ from .utils import build_judge, DEBUG_MESSAGE
 FAIL_MSG = 'Failed to obtain answer via API.'
 
 
+def get_final_rating(score_file):
+    data = load(score_file)
+    final_rating = data['score'].mean()
+    return {'final_rating': f'{final_rating:.3f}'}
+
+
 def unwrap_hf_pkl(pth, suffix='.mp4'):
     base_dir = os.path.join(pth, 'video_pkl/')
     target_dir = os.path.join(pth, 'video/')
@@ -30,13 +36,13 @@ def unwrap_hf_pkl(pth, suffix='.mp4'):
 
 class VideoMMEv2(VideoBaseDataset):
 
-    MD5 = 'c39d122d7c047420c2d92d45ac640bf0'
+    MD5 = '3375879392eaaccaa97205aa8784ee14'
     SYS = ''
 
     FRAMES_TMPL_NOSUB = """
 These are the frames of a video. \
 Select the best answer to the following multiple-choice question based on the video. \
-Respond with only the letter (A, B, C, or D) of the correct option.
+Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
 """
 
     TYPE = 'Video-MCQ'
@@ -61,7 +67,7 @@ Respond with only the letter (A, B, C, or D) of the correct option.
                 return False
             data = load(data_file)
             for video_pth in data['video']:
-                if not osp.exists(osp.join(pth, video_pth + '.mp4')):
+                if not osp.exists(osp.join(pth, f"{video_pth:03d}" + '.mp4')):
                     return False
             return True
 
@@ -104,14 +110,13 @@ Respond with only the letter (A, B, C, or D) of the correct option.
                 if os.path.exists(data_file) and md5(data_file) == self.MD5:
                     return
 
-                data_file = pd.read_parquet("/mnt/castle/dyh/lxy.parquet")
+                data_file = pd.read_parquet("./test.parquet")
                 data_file = data_file.assign(index=range(len(data_file)))
-                # concat one column with key answer
-                data_file['answer'] = 'A'
-                data_file['video'] = data_file['video_id'].apply(lambda x: 'lxy_' + x)
 
+                data_file['video'] = data_file['video_id'].apply(lambda x: str(x))
+                import pdb; pdb.set_trace()
                 data_file = data_file[['index', 'video', 'url', 'group_type',
-                                       'question_id', 'question', 'options', 'level', 'second_head', 'third_head', 'answer']]
+                                       'question_id', 'question', 'options', 'answer', 'level', 'second_head', 'third_head', 'answer']]
 
                 data_file.to_csv(osp.join(pth, f'{dataset_name}.tsv'), sep='\t', index=False)
 
@@ -131,8 +136,7 @@ Respond with only the letter (A, B, C, or D) of the correct option.
         return dict(data_file=data_file, root=dataset_path)
 
     def save_video_frames(self, video, video_llm=False):
-
-        vid_path = osp.join(self.data_root, 'video', video + '.mp4')
+        vid_path = osp.join(self.data_root, 'video', f"{video:03d}" + '.mp4')
         import decord
         vid = decord.VideoReader(vid_path)
         video_info = {
@@ -142,14 +146,14 @@ Respond with only the letter (A, B, C, or D) of the correct option.
         if self.nframe > 0 and self.fps < 0:
             step_size = len(vid) / (self.nframe + 1)
             indices = [int(i * step_size) for i in range(1, self.nframe + 1)]
-            frame_paths = self.frame_paths(video)
+            frame_paths = self.frame_paths(f"{video:03d}")
         elif self.fps > 0:
             # not constrained by num_frames, get frames by fps
             total_duration = video_info['n_frames'] / video_info['fps']
             required_frames = int(total_duration * self.fps)
             step_size = video_info['fps'] / self.fps
             indices = [int(i * step_size) for i in range(required_frames)]
-            frame_paths = self.frame_paths_fps(video, len(indices))
+            frame_paths = self.frame_paths_fps(f"{video:03d}", len(indices))
 
         flag = np.all([osp.exists(p) for p in frame_paths])
 
@@ -174,7 +178,7 @@ Respond with only the letter (A, B, C, or D) of the correct option.
 
         message = [dict(type='text', value=self.SYS)]
         if video_llm:
-            message.append(dict(type='video', value=osp.join(self.data_root, 'video', line['video'] + '.mp4')))
+            message.append(dict(type='video', value=osp.join(self.data_root, 'video', f"{line['video']:03d}" + '.mp4')))
         else:
             for im in frames:
                 message.append(dict(type='image', value=im))
@@ -189,7 +193,7 @@ Respond with only the letter (A, B, C, or D) of the correct option.
     # It returns a dictionary
     @classmethod
     def evaluate(self, eval_file, **judge_kwargs):
-        from .utils.videomme import get_dimension_rating, extract_characters_regex, extract_option
+        from .utils.videomme import extract_characters_regex, extract_option
 
         assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv'], 'data file should be an supported format (xlsx/json/tsv) file'  # noqa: E501
 
@@ -241,7 +245,6 @@ Respond with only the letter (A, B, C, or D) of the correct option.
             )
 
             dump(data, score_file)
-
-        rating = get_dimension_rating(score_file)
+        rating = get_final_rating(score_file)
         dump(rating, tgt_file)
         return rating
