@@ -148,3 +148,27 @@ def extract_characters_regex(s):
     if matches is None:
         return ''
     return matches[0]
+
+def extract_characters_regex_v2(s):
+    s = s.strip()
+    answer_prefixes = [
+        'The best answer is',
+        'The correct answer is',
+        'The answer is',
+        'The answer',
+        'The best option is'
+        'The correct option is',
+        'Best answer:'
+        'Best option:',
+        'Answer:',
+        'Option:',
+    ]
+    for answer_prefix in answer_prefixes:
+        s = s.replace(answer_prefix, '')
+
+    if len(s.split()) > 10 and not re.search('[ABCDEFGH]', s):
+        return ''
+    matches = re.search(r'[ABCDEFGH]', s)
+    if matches is None:
+        return ''
+    return matches[0]

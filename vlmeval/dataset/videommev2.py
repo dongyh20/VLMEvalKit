@@ -3,14 +3,74 @@ from ..smp import *
 from ..smp.file import get_intermediate_file_path, get_file_extension
 from .video_base import VideoBaseDataset
 from .utils import build_judge, DEBUG_MESSAGE
+import ast
 
 FAIL_MSG = 'Failed to obtain answer via API.'
+
+def cal_relevance(scores):
+    score_map_exponential = {0: 0.0, 1: 100.0 / 16, 2: 100.0 * 4 / 16, 3: 100.0 * 9 / 16, 4: 100.0}
+    correct_count = sum(scores)
+    exp_score = score_map_exponential.get(correct_count, 0.0)
+    return exp_score
+
+def cal_logic(scores, group_structure):
+    group_structure_list = ast.literal_eval(group_structure)
+    last_correct_idx = -1
+    for idx, val in enumerate(scores):
+        if val:
+            last_correct_idx = idx
+        else:
+            break
+    if group_structure_list == [1, 2, 3, 4]:
+        score_map = {0: 0.0, 1: 100.0 / 16, 2: 100.0 * 4 / 16, 3: 100.0 * 9 / 16, 4: 100.0}
+    elif group_structure_list == [1, [2, 3], 4]:
+        score_map = {0: 0.0, 1: 100.0 / 12, 2: 100.0 * 4 / 12, 3: 100.0 * 7 / 12, 4: 100.0}
+    elif group_structure_list == [[1, 2], 3, 4]:
+        score_map = {0: 0.0, 1: 100.0 / 10, 2: 100.0 * 2 / 10, 3: 100.0 * 5 / 10, 4: 100.0}
+    else:
+        raise ValueError(f"未知的group_structure_list: {group_structure_list}")
+    logic_score = score_map.get(last_correct_idx + 1, 0.0)
+    return logic_score
 
 
 def get_final_rating(score_file):
     data = load(score_file)
-    final_rating = data['score'].mean()
-    return {'final_rating': f'{final_rating:.3f}'}
+    all_groups = [[] for _ in range((len(data) + 1) // 4)]
+    final_rating = {
+        "level_1": [],
+        "level_2": [],
+        "level_3": [],
+        "relevance_score": [],
+        "logic_score": [],
+        "total": [],
+    }
+    for i in range(len(data)):
+        level, group_type, group_structure, score = (
+            data.loc[i, 'level'],
+            data.loc[i, 'group_type'],
+            data.loc[i, 'group_structure'],
+            data.loc[i, 'score'],
+        )
+        if level not in [1, 2, 3]:
+            level = 3
+        all_groups[i // 4].append((level, group_type, group_structure, score))
+    for group in all_groups:
+        level, group_type, group_structure = int(group[0][0]), group[0][1], group[0][2]
+        scores = [item[3] for item in group]
+        if group_type == '相关性':
+            exp_score = cal_relevance(scores)
+            final_rating['relevance_score'].append(exp_score)
+        elif group_type == '逻辑链':
+            exp_score = cal_logic(scores, group_structure)
+            final_rating['logic_score'].append(exp_score)
+        else:
+            raise ValueError(f'未知的group_type: {group_type}')
+        final_rating[f'level_{level}'].append(exp_score)
+        final_rating['total'].append(exp_score)
+    import pdb; pdb.set_trace()
+    for key in final_rating:
+        final_rating[key] = sum(final_rating[key]) / len(final_rating[key]) if len(final_rating[key]) > 0 else 0.0
+    return final_rating
 
 
 def unwrap_hf_pkl(pth, suffix='.mp4'):
@@ -36,7 +96,7 @@ def unwrap_hf_pkl(pth, suffix='.mp4'):
 
 class VideoMMEv2(VideoBaseDataset):
 
-    MD5 = '3375879392eaaccaa97205aa8784ee14'
+    MD5 = '9dcf6f01c50b4e67addac2dcee855f1a'
     SYS = ''
 
     FRAMES_TMPL_NOSUB = """
@@ -72,8 +132,8 @@ Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
             return True
 
         # original usage
-        cache_path = get_cache_path(repo_id)
-        # cache_path = "/apdcephfs_jn/share_302244400/peterrao/data/videommev2"
+        # cache_path = get_cache_path(repo_id)
+        cache_path = "/apdcephfs_jn/share_302244400/peterrao/data/videommev2"
         if cache_path is not None and check_integrity(cache_path):
             dataset_path = cache_path
         else:
@@ -110,26 +170,25 @@ Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
                 if os.path.exists(data_file) and md5(data_file) == self.MD5:
                     return
 
-                data_file = pd.read_parquet("./test.parquet")
+                data_file = pd.read_parquet("/mnt/castle/dyh/VLMEvalKit/test.parquet")
                 data_file = data_file.assign(index=range(len(data_file)))
 
                 data_file['video'] = data_file['video_id'].apply(lambda x: str(x))
-                import pdb; pdb.set_trace()
-                data_file = data_file[['index', 'video', 'url', 'group_type',
+                data_file = data_file[['index', 'video', 'url', 'group_type', 'group_structure',
                                        'question_id', 'question', 'options', 'answer', 'level', 'second_head', 'third_head', 'answer']]
 
                 data_file.to_csv(osp.join(pth, f'{dataset_name}.tsv'), sep='\t', index=False)
 
             # original usage
-            if modelscope_flag_set():
-                from modelscope import dataset_snapshot_download
-                dataset_path = dataset_snapshot_download(dataset_id=repo_id)
-            else:
-                dataset_path = snapshot_download(repo_id=repo_id, repo_type='dataset')
-            unzip_hf_zip(dataset_path)
-            generate_tsv(dataset_path)
-            # dataset_path = "/apdcephfs_jn/share_302244400/peterrao/data/videommev2"
+            # if modelscope_flag_set():
+            #     from modelscope import dataset_snapshot_download
+            #     dataset_path = dataset_snapshot_download(dataset_id=repo_id)
+            # else:
+            #     dataset_path = snapshot_download(repo_id=repo_id, repo_type='dataset')
+            # unzip_hf_zip(dataset_path)
             # generate_tsv(dataset_path)
+            dataset_path = "/apdcephfs_jn/share_302244400/peterrao/data/videommev2"
+            generate_tsv(dataset_path)
 
         data_file = osp.join(dataset_path, f'{dataset_name}.tsv')
 
@@ -193,7 +252,7 @@ Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
     # It returns a dictionary
     @classmethod
     def evaluate(self, eval_file, **judge_kwargs):
-        from .utils.videomme import extract_characters_regex, extract_option
+        from .utils.videomme import extract_characters_regex_v2, extract_option
 
         assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv'], 'data file should be an supported format (xlsx/json/tsv) file'  # noqa: E501
 
@@ -226,7 +285,7 @@ Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
                 ans = data.loc[data['index'] == idx, 'answer'].values[0]
                 pred = str(data.loc[data['index'] == idx, 'prediction'].values[0])
 
-                if extract_characters_regex(pred) == '':
+                if extract_characters_regex_v2(pred) == '':
                     extract_pred = extract_option(
                         model,
                         data.loc[data['index'] == idx].to_dict(orient='records')[0],
@@ -234,7 +293,7 @@ Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
                     )
                     data.loc[data['index'] == idx, 'score'] = int(extract_pred == ans)
                 else:
-                    data.loc[data['index'] == idx, 'score'] = int(extract_characters_regex(pred) == ans)
+                    data.loc[data['index'] == idx, 'score'] = int(extract_characters_regex_v2(pred) == ans)
 
             rejected = [x for x in data['score'] if x == -1]
 
