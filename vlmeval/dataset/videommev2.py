@@ -11,7 +11,8 @@ def cal_relevance(scores):
     score_map_exponential = {0: 0.0, 1: 100.0 / 16, 2: 100.0 * 4 / 16, 3: 100.0 * 9 / 16, 4: 100.0}
     correct_count = sum(scores)
     exp_score = score_map_exponential.get(correct_count, 0.0)
-    return exp_score
+    linear_score = correct_count * 25.0
+    return exp_score, linear_score
 
 def cal_logic(scores, group_structure):
     group_structure_list = ast.literal_eval(group_structure)
@@ -25,8 +26,12 @@ def cal_logic(scores, group_structure):
         score_map = {0: 0.0, 1: 100.0 / 16, 2: 100.0 * 4 / 16, 3: 100.0 * 9 / 16, 4: 100.0}
     elif group_structure_list == [1, [2, 3], 4]:
         score_map = {0: 0.0, 1: 100.0 / 12, 2: 100.0 * 4 / 12, 3: 100.0 * 7 / 12, 4: 100.0}
+        if last_correct_idx == 0 and scores[2]:
+            last_correct_idx += 1
     elif group_structure_list == [[1, 2], 3, 4]:
         score_map = {0: 0.0, 1: 100.0 / 10, 2: 100.0 * 2 / 10, 3: 100.0 * 5 / 10, 4: 100.0}
+        if last_correct_idx == -1 and scores[1]:
+            last_correct_idx += 1
     else:
         raise ValueError(f"未知的group_structure_list: {group_structure_list}")
     logic_score = score_map.get(last_correct_idx + 1, 0.0)
@@ -44,23 +49,29 @@ def get_final_rating(score_file):
         "level_2": [],
         "level_3": [],
         "relevance_score": [],
+        "relevance_linear_score": [],
         "logic_score": [],
         "total": [],
     }
+    second_head_rating = {}
+    third_head_rating = {}
     for i in range(len(data)):
-        level, group_type, group_structure, score = (
+        level, group_type, group_structure, score, second_head, third_head = (
             data.loc[i, 'level'],
             data.loc[i, 'group_type'],
             data.loc[i, 'group_structure'],
             data.loc[i, 'score'],
+            data.loc[i, 'second_head'],
+            data.loc[i, 'third_head'],
         )
-        all_groups[i // 4].append((level, group_type, group_structure, score))
+        all_groups[i // 4].append((level, group_type, group_structure, score, second_head, third_head))
     for group in all_groups:
-        level, group_type, group_structure = int(group[-1][0]), group[-1][1], group[-1][2]
+        level, group_type, group_structure, second_head, third_head = int(group[-1][0]), group[-1][1], group[-1][2], group[-1][4], group[-1][5]
         scores = [item[3] for item in group]
         if group_type == '相关性':
-            exp_score = cal_relevance(scores)
+            exp_score, linear_score = cal_relevance(scores)
             final_rating['relevance_score'].append(exp_score)
+            final_rating['relevance_linear_score'].append(linear_score)
         elif group_type == '逻辑链':
             exp_score = cal_logic(scores, group_structure)
             final_rating['logic_score'].append(exp_score)
@@ -68,9 +79,19 @@ def get_final_rating(score_file):
             raise ValueError(f'未知的group_type: {group_type}')
         final_rating[f'level_{level}'].append(exp_score)
         final_rating['total'].append(exp_score)
+        if second_head not in second_head_rating:
+            second_head_rating[second_head] = []
+        second_head_rating[second_head].append(exp_score)
+        if third_head not in third_head_rating:
+            third_head_rating[third_head] = []
+        third_head_rating[third_head].append(exp_score)
     for key in final_rating:
         final_rating[key] = sum(final_rating[key]) / len(final_rating[key]) if len(final_rating[key]) > 0 else 0.0
-    return final_rating
+    for key in second_head_rating:
+        second_head_rating[key] = sum(second_head_rating[key]) / len(second_head_rating[key]) if len(second_head_rating[key]) > 0 else 0.0
+    for key in third_head_rating:
+        third_head_rating[key] = sum(third_head_rating[key]) / len(third_head_rating[key]) if len(third_head_rating[key]) > 0 else 0.0
+    return {'final_rating': final_rating, 'second_head_rating': second_head_rating, 'third_head_rating': third_head_rating}
 
 
 def unwrap_hf_pkl(pth, suffix='.mp4'):
