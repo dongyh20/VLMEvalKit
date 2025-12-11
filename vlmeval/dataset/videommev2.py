@@ -35,6 +35,9 @@ def cal_logic(scores, group_structure):
 
 def get_final_rating(score_file):
     data = load(score_file)
+    # final_rating = {}
+    # final_rating["score"] = data['score'].mean()
+    # return final_rating
     all_groups = [[] for _ in range((len(data) + 1) // 4)]
     final_rating = {
         "level_1": [],
@@ -51,11 +54,9 @@ def get_final_rating(score_file):
             data.loc[i, 'group_structure'],
             data.loc[i, 'score'],
         )
-        if level not in [1, 2, 3]:
-            level = 3
         all_groups[i // 4].append((level, group_type, group_structure, score))
     for group in all_groups:
-        level, group_type, group_structure = int(group[0][0]), group[0][1], group[0][2]
+        level, group_type, group_structure = int(group[-1][0]), group[-1][1], group[-1][2]
         scores = [item[3] for item in group]
         if group_type == '相关性':
             exp_score = cal_relevance(scores)
@@ -67,7 +68,6 @@ def get_final_rating(score_file):
             raise ValueError(f'未知的group_type: {group_type}')
         final_rating[f'level_{level}'].append(exp_score)
         final_rating['total'].append(exp_score)
-    import pdb; pdb.set_trace()
     for key in final_rating:
         final_rating[key] = sum(final_rating[key]) / len(final_rating[key]) if len(final_rating[key]) > 0 else 0.0
     return final_rating
@@ -260,7 +260,8 @@ Respond with only the letter (A, B, C, D, E, F, G, or H) of the correct option.
         tgt_file = get_intermediate_file_path(eval_file, '_rating', 'json')
         score_file = get_intermediate_file_path(eval_file, '_score')
 
-        if not osp.exists(score_file):
+        # if not osp.exists(score_file):
+        if True:
             model = judge_kwargs.get('model', 'exact_matching')
             assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
 
